@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>더치페이 데모 - 데이터 입력</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-6">
+  <div class="max-w-xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4">데이터 입력</h1>
+
+    <div class="mb-6">
+      <label for="persona-select" class="block font-medium mb-1">페르소나 선택:</label>
+      <select id="persona-select" class="border rounded p-2 w-full"></select>
+      <p class="text-sm text-gray-500 mt-1">선택한 페르소나는 결제와 입금에 모두 적용됩니다.</p>
+    </div>
+
+    <div class="mb-8">
+      <h2 class="text-xl font-semibold mb-3">결제 (Expense)</h2>
+      <form id="payment-form" class="space-y-3">
+        <div>
+          <label class="block mb-1">카테고리:</label>
+          <select id="category-input" class="border rounded p-2 w-full">
+            <option value="restaurants">음식점</option>
+            <option value="cafe">카페</option>
+          </select>
+        </div>
+        <div>
+          <label class="block mb-1">금액 (KRW):</label>
+          <input id="amount-input" type="number" step="1000" min="0" class="border rounded p-2 w-full" required />
+        </div>
+        <div>
+          <label class="block mb-1">날짜/시간:</label>
+          <input id="datetime-input" type="datetime-local" class="border rounded p-2 w-full" required />
+        </div>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">결제 전송</button>
+      </form>
+    </div>
+
+    <div class="mb-8">
+      <h2 class="text-xl font-semibold mb-3">입금 (Deposit)</h2>
+      <form id="deposit-form" class="space-y-3">
+        <div>
+          <label class="block mb-1">금액 (KRW):</label>
+          <input id="deposit-amount-input" type="number" step="1000" min="0" class="border rounded p-2 w-full" required />
+        </div>
+        <div>
+          <label class="block mb-1">날짜/시간:</label>
+          <input id="deposit-datetime-input" type="datetime-local" class="border rounded p-2 w-full" required />
+        </div>
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">입금 전송</button>
+      </form>
+    </div>
+
+    <div class="mb-8">
+      <h2 class="text-xl font-semibold mb-3">벌크 전송 (JSON 배열)</h2>
+      <div class="flex gap-2 mb-2 text-sm">
+        <span class="text-gray-500">샘플:</span>
+        <button id="sampleA" class="px-2 py-1 rounded border bg-white">A</button>
+        <button id="sampleB" class="px-2 py-1 rounded border bg-white">B</button>
+        <button id="sampleC" class="px-2 py-1 rounded border bg-white">C</button>
+      </div>
+      <textarea id="bulk-json" class="w-full h-40 border rounded p-2 text-sm" placeholder='[{"id":"dinner","datetime":"2025-10-13 19:30","amount":120000,"type":"expense","category":"restaurants"},{"id":"r1","datetime":"2025-10-13 21:30","amount":40000,"type":"deposit"}]'></textarea>
+      <button id="btn-bulk" class="mt-2 bg-gray-700 text-white px-4 py-2 rounded hover:bg-black">전송(벌크)</button>
+    </div>
+
+    <p class="text-sm text-gray-500">채팅 보기: <a href="/static/chat.html" class="text-blue-600 underline">/static/chat.html</a></p>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      fetch('/personas').then(r=>r.json()).then(data => {
+        const sel = document.getElementById('persona-select');
+        (data.personas||[]).forEach(p => {
+          const opt = document.createElement('option'); opt.value = p.id; opt.textContent = p.label; sel.appendChild(opt);
+        });
+        const saved = localStorage.getItem('persona_id');
+        if (saved && (data.personas||[]).some(p => p.id === saved)) { sel.value = saved; }
+        else if ((data.personas||[]).length) { sel.value = data.personas[0].id; localStorage.setItem('persona_id', sel.value); }
+      });
+
+      document.getElementById('persona-select').addEventListener('change', e => {
+        localStorage.setItem('persona_id', e.target.value);
+      });
+    });
+
+    document.getElementById('payment-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const personaId = document.getElementById('persona-select').value;
+      const category = document.getElementById('category-input').value;
+      const amount = parseFloat(document.getElementById('amount-input').value || '0');
+      const dt = document.getElementById('datetime-input').value;
+      if (!personaId || !dt) return;
+      fetch('/payments', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ persona_id: personaId, type:'expense', category, amount, datetime: dt })
+      }).then(r=>r.json()).then(_ => alert('결제 이벤트를 전송했습니다.'));
+    });
+
+    document.getElementById('deposit-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const personaId = document.getElementById('persona-select').value;
+      const amount = parseFloat(document.getElementById('deposit-amount-input').value || '0');
+      const dt = document.getElementById('deposit-datetime-input').value;
+      if (!personaId || !dt) return;
+      fetch('/deposits', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ persona_id: personaId, type:'deposit', amount, datetime: dt })
+      }).then(r=>r.json()).then(_ => alert('입금 이벤트를 전송했습니다.'));
+    });
+
+    function fillSample(which) {
+      let sample = [];
+      if (which === 'A') {
+        sample = [
+          {"id":"e1","datetime":"2025-10-10 12:10","amount":15000,"type":"expense","category":"restaurants"},
+          {"id":"e2","datetime":"2025-10-11 12:20","amount":17000,"type":"expense","category":"restaurants"},
+          {"id":"e3","datetime":"2025-10-12 12:15","amount":15000,"type":"expense","category":"restaurants"},
+          {"id":"dinner","datetime":"2025-10-13 19:30","amount":120000,"type":"expense","category":"restaurants"},
+          {"id":"r1","datetime":"2025-10-13 21:30","amount":40000,"type":"deposit"},
+          {"id":"r2","datetime":"2025-10-13 21:45","amount":40000,"type":"deposit"},
+          {"id":"r3","datetime":"2025-10-14 09:15","amount":40000,"type":"deposit"}
+        ];
+      } else if (which === 'B') {
+        sample = [
+          {"id":"e1","datetime":"2025-10-10 12:10","amount":14000,"type":"expense","category":"restaurants"},
+          {"id":"e2","datetime":"2025-10-11 12:20","amount":16000,"type":"expense","category":"restaurants"},
+          {"id":"dinner","datetime":"2025-10-13 19:30","amount":100000,"type":"expense","category":"restaurants"}
+        ];
+      } else if (which === 'C') {
+        sample = [
+          {"id":"e1","datetime":"2025-10-10 12:10","amount":16000,"type":"expense","category":"restaurants"},
+          {"id":"e2","datetime":"2025-10-11 12:25","amount":15000,"type":"expense","category":"restaurants"},
+          {"id":"dinner","datetime":"2025-10-13 19:30","amount":120000,"type":"expense","category":"restaurants"},
+          {"id":"r1","datetime":"2025-10-13 22:00","amount":20000,"type":"deposit"},
+          {"id":"r2","datetime":"2025-10-14 08:30","amount":10000,"type":"deposit"}
+        ];
+      }
+      document.getElementById('bulk-json').value = JSON.stringify(sample, null, 2);
+    }
+
+    document.getElementById('sampleA').addEventListener('click', () => fillSample('A'));
+    document.getElementById('sampleB').addEventListener('click', () => fillSample('B'));
+    document.getElementById('sampleC').addEventListener('click', () => fillSample('C'));
+
+    document.getElementById('btn-bulk').addEventListener('click', async () => {
+      let arr = [];
+      try {
+        arr = JSON.parse(document.getElementById('bulk-json').value);
+        if (!Array.isArray(arr)) throw new Error('JSON 배열이어야 합니다');
+      } catch(e) {
+        alert('JSON 파싱 오류: ' + e);
+        return;
+      }
+      const personaId = document.getElementById('persona-select').value;
+      for (const item of arr) {
+        const isDeposit = String(item.type).toLowerCase() === 'deposit';
+        const url = isDeposit ? '/deposits' : '/payments';
+        const payload = Object.assign({ persona_id: personaId }, item);
+        await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+          .then(r=>r.json()).catch(()=>{});
+        await new Promise(r=>setTimeout(r,120));
+      }
+      alert('벌크 전송 완료! 채팅창에서 결과를 확인하세요.');
+    });
+  </script>
+</body>
+</html>

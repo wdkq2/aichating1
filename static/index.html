@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>더치페이 데모 Hub</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; height: 100vh; display: flex; }
+    #left, #right { flex: 1; display: flex; flex-direction: column; }
+    header { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
+    h1 { font-size: 16px; margin: 0; }
+    iframe { border: 0; width: 100%; height: calc(100vh - 44px); }
+    .hint { color: #6b7280; font-size: 12px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div id="left">
+    <header>
+      <h1>입력 (input.html)</h1>
+      <div class="hint">POST /payments, /deposits — 페르소나는 localStorage로 공유됩니다.</div>
+    </header>
+    <iframe src="/static/input.html"></iframe>
+  </div>
+  <div id="right">
+    <header>
+      <h1>채팅 (chat.html)</h1>
+      <div class="hint">GET /events 폴링 → CANDIDATE_PROMPT/SETTLEMENT_COMPLETED 표시 · 예/아니오 라벨링</div>
+    </header>
+    <iframe src="/static/chat.html"></iframe>
+  </div>
+</body>
+</html>
