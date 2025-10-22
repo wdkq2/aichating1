@@ -240,6 +240,16 @@ class DutchPayEngine:
         amounts = []
         ctx_vals = {}
         _ = max([tx["datetime"] for tx in self.transactions] or [datetime.now(timezone.utc)])
+        # Gather known candidate payment ids so we can exclude them from the
+        # baseline even if they predate the "exclude_from_baseline" flag (for
+        # example transactions recorded before the v3.1.1 patch).  This keeps
+        # long-running servers consistent after upgrades.
+        excluded_ids = {
+            pid
+            for cand in self.candidates.values()
+            for pid in [cand.get("payment", {}).get("id")]
+            if pid and cand.get("state") in {"CANDIDATE", "CONFIRMED"}
+        }
         for tx in self.transactions:
             if tx.get("type") != "deposit" and tx.get("amount", 0) > 0:
                 # Exclude transactions that have been marked as dutch-pay
@@ -248,7 +258,7 @@ class DutchPayEngine:
                 # personal spending profile.  Without this guard, a confirmed
                 # dutch-pay would double the effective median, preventing the
                 # next legitimate candidate from being detected.
-                if tx.get("exclude_from_baseline"):
+                if tx.get("exclude_from_baseline") or tx.get("id") in excluded_ids:
                     continue
                 # We do not apply a lookback cutoff here; the engine may be
                 # extended with lookback in future
@@ -506,6 +516,8 @@ class DutchPayEngine:
                         break
                 # Candidate confirmed
                 cand["state"] = "CONFIRMED"
+                # Ensure the payment never contributes to future baselines
+                pay_tx.setdefault("exclude_from_baseline", True)
                 adjusted_amount = max(0.0, pay_tx["amount"] - cand["sum_deposits"])
                 # Build settlement notification
                 settlement = {
