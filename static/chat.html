@@ -54,9 +54,24 @@
     .timestamp {
       color: var(--muted);
     }
+
+    .floating-panel {
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--border);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
+    }
   </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-6">
+<body class="min-h-screen flex items-center justify-center p-6 relative">
+  <div class="absolute top-4 left-4 sm:top-6 sm:left-6 z-10 flex flex-col gap-1 text-[12px] floating-panel rounded-xl px-3 py-2" style="color:var(--muted)">
+    <span class="tracking-wide text-[11px] font-semibold" style="letter-spacing:0.08em">페르소나</span>
+    <div class="flex items-center gap-2">
+      <select id="persona" class="px-2 py-1 rounded-md border bg-white text-[13px] w-36" style="border-color:var(--border); color:var(--text)"></select>
+      <button id="btn-refresh" class="px-2 py-1 rounded-md text-[12px] flex items-center gap-1 control-button" style="color:var(--text)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6M20 20v-6h-6 M20 9a8 8 0 1 0 2 5"/></svg> 새로고침</button>
+    </div>
+  </div>
   <div class="w-[390px] rounded-3xl overflow-hidden shadow-xl flex flex-col relative bg-white" style="border:1px solid var(--border)">
     <header class="h-14 flex items-center justify-between border-b px-4" style="border-color:var(--border)">
       <button class="p-2 text-gray-800" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg></button>
@@ -77,12 +92,8 @@
       </div>
     </main>
     <div class="absolute left-0 right-0 bottom-0">
-      <div class="px-4 pb-4 space-y-2" style="background: var(--chatBg)">
-        <div class="flex items-center gap-2 text-[13px]">
-          <span class="text-[12px]" style="color:var(--muted)">페르소나</span>
-          <select id="persona" class="px-2 py-1 rounded-md border bg-white" style="border-color:var(--border)"></select>
-          <button id="btn-refresh" class="px-2 py-1 rounded-md text-xs flex items-center gap-1 control-button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6M20 20v-6h-6 M20 9a8 8 0 1 0 2 5"/></svg> 새로고침</button>
-          <span class="flex-1"></span>
+      <div class="px-4 pb-4 space-y-3" style="background: var(--chatBg)">
+        <div class="flex items-center justify-end gap-2 text-[12px]" style="color:var(--muted)">
           <button id="btn-bot-avatar" class="flex items-center gap-1 px-2 py-1 rounded-md text-xs control-button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z M8 14l3-4 3 4 2-3 4 6H6z M12 7v4 M10 9h4"/></svg> 상대</button>
           <button id="btn-me-avatar" class="flex items-center gap-1 px-2 py-1 rounded-md text-xs control-button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z M8 14l3-4 3 4 2-3 4 6H6z M12 7v4 M10 9h4"/></svg> 나</button>
           <input id="file-bot" type="file" accept="image/*" class="hidden" />
