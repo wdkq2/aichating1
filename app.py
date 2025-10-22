@@ -242,6 +242,14 @@ class DutchPayEngine:
         _ = max([tx["datetime"] for tx in self.transactions] or [datetime.now(timezone.utc)])
         for tx in self.transactions:
             if tx.get("type") != "deposit" and tx.get("amount", 0) > 0:
+                # Exclude transactions that have been marked as dutch-pay
+                # candidates/confirmed settlements from the baseline so that
+                # exceptionally large group payments do not inflate the
+                # personal spending profile.  Without this guard, a confirmed
+                # dutch-pay would double the effective median, preventing the
+                # next legitimate candidate from being detected.
+                if tx.get("exclude_from_baseline"):
+                    continue
                 # We do not apply a lookback cutoff here; the engine may be
                 # extended with lookback in future
                 amt = float(tx["amount"])
@@ -405,6 +413,11 @@ class DutchPayEngine:
         self.transactions.append(tx_obj)
         if not is_large:
             return None
+        # Mark large expenses so they are ignored when building future
+        # baselines.  This keeps confirmed dutch-pay expenses from raising the
+        # thresholds and suppressing subsequent detections for the same
+        # persona.
+        tx_obj["exclude_from_baseline"] = True
         # Estimate party size and per‑person share using baseline
         n_hat, s_hat = self._estimate_party(tx_amount, tx_dt, tx_category, baseline)
         # Minimum deposits required (n_hat - 1), bounded
