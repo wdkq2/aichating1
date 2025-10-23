@@ -608,12 +608,38 @@ class DutchPayEngine:
         return None
 
     def label_payment(self, payment_id: str, label: str):
-        # Store a user label for later analysis.  Does not affect logic.
+        """Apply a manual label to a candidate payment.
+
+        Returning ``True`` indicates that the payment existed.  A ``NO`` label
+        dismisses the candidate entirely so that future deposits no longer try
+        to match against it and any already-consumed reimbursements become
+        available for other candidates.  ``YES`` currently only records the
+        feedback for telemetry purposes.
+        """
+
         cand = self.candidates.get(payment_id)
-        if cand:
-            cand.setdefault("user_label", label)
-            return True
-        return False
+        if not cand:
+            return False
+
+        cand.setdefault("user_label", label)
+
+        if label == "NO":
+            # Release any deposits that may have been tentatively attributed to
+            # this candidate so they remain usable if another dutch-pay is
+            # active in the same window.
+            for dep in cand.get("deposits", []):
+                dep_id = dep.get("id")
+                if dep_id:
+                    self.used_deposits.discard(dep_id)
+            pay_tx = cand.get("payment") or {}
+            # Re-include the payment in future baselines since the user
+            # confirmed it was a solo expense.
+            pay_tx.pop("exclude_from_baseline", None)
+            cand["state"] = "DISMISSED"
+            # Remove the candidate entirely so it cannot interfere with other
+            # payments.
+            self.candidates.pop(payment_id, None)
+        return True
 
 ######################################################################
 # HTTP Handler
