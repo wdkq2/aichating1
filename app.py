@@ -38,9 +38,9 @@ from datetime import datetime, timedelta, timezone
 # Persona definitions
 #
 # Each persona describes typical per‑person spend for the time bucket,
-# category and weekday/weekend.  The ``mix_k`` parameter controls how
-# quickly real data overrides the seed values (larger values favour the
-# persona seed when little data exists).
+# category and weekday/weekend.  The ``share_seed`` table now fully defines the
+# expected per-person share; ``mix_k`` is retained for backward compatibility
+# but new observations no longer alter these seed values.
 ######################################################################
 PERSONAS: dict = {
     "P1": {
@@ -240,8 +240,26 @@ class DutchPayEngine:
         amounts = []
         ctx_vals = {}
         _ = max([tx["datetime"] for tx in self.transactions] or [datetime.now(timezone.utc)])
+        # Gather known candidate payment ids so we can exclude them from the
+        # baseline even if they predate the "exclude_from_baseline" flag (for
+        # example transactions recorded before the v3.1.1 patch).  This keeps
+        # long-running servers consistent after upgrades.
+        excluded_ids = {
+            pid
+            for cand in self.candidates.values()
+            for pid in [cand.get("payment", {}).get("id")]
+            if pid and cand.get("state") in {"CANDIDATE", "CONFIRMED"}
+        }
         for tx in self.transactions:
             if tx.get("type") != "deposit" and tx.get("amount", 0) > 0:
+                # Exclude transactions that have been marked as dutch-pay
+                # candidates/confirmed settlements from the baseline so that
+                # exceptionally large group payments do not inflate the
+                # personal spending profile.  Without this guard, a confirmed
+                # dutch-pay would double the effective median, preventing the
+                # next legitimate candidate from being detected.
+                if tx.get("exclude_from_baseline") or tx.get("id") in excluded_ids:
+                    continue
                 # We do not apply a lookback cutoff here; the engine may be
                 # extended with lookback in future
                 amt = float(tx["amount"])
@@ -321,25 +339,47 @@ class DutchPayEngine:
         return is_large, debug
 
     # Compute the expected per‑person share for a given time context and category.
-    # This blends the persona seed with observed data using the mix_k parameter.
+    # The value is derived exclusively from the persona's seed table so it remains
+    # stable regardless of newly observed transactions.
     def _compute_share(self, dt: datetime, category: str, baseline) -> float:
-        # Determine context key and fetch baseline median and count
-        key = f"{self._bucket_of(dt)}:{self._weektag(dt)}"
-        ctx = baseline["ctx"].get(key, {"median": baseline["global"]["median"], "count": 0})
-        m_data = ctx["median"]
-        n_data = ctx.get("count", 0)
-        # Persona seed for this context
-        seed_cat = self.share_seed.get(category, {})
-        # Fallback to global weekend/weekday if missing bucket
+        """Return the per-person share using only persona seed values.
+
+        Operational feedback should not modify the expected share; instead we
+        rely solely on the fixed seed tables defined for each persona.  The
+        ``baseline`` argument is still accepted for signature compatibility but
+        is no longer consulted when computing the share.
+        """
+
+        def _seed_lookup(cat_seed: dict, week: str, bucket: str):
+            val = cat_seed.get(week, {}).get(bucket)
+            return float(val) if val else None
+
+        def _seed_fallback(cat_seed: dict, week: str):
+            # Prefer other buckets in the same week, then all remaining seeds.
+            week_vals = [
+                float(v)
+                for v in cat_seed.get(week, {}).values()
+                if v and float(v) > 0
+            ]
+            if week_vals:
+                return sum(week_vals) / len(week_vals)
+            all_vals = [
+                float(v)
+                for week_map in cat_seed.values()
+                for v in week_map.values()
+                if v and float(v) > 0
+            ]
+            if all_vals:
+                return sum(all_vals) / len(all_vals)
+            # Final fallback: reasonable constant so detection can proceed.
+            return 15000.0
+
+        cat_seed = self.share_seed.get(category, {})
         persona_week = self._weektag(dt)
         persona_bucket = self._bucket_of(dt)
-        m_persona = seed_cat.get(persona_week, {}).get(persona_bucket)
-        if m_persona is None:
-            # If persona seed missing, fall back to global median
-            m_persona = baseline["global"]["median"]
-        # Weight between data and persona seed
-        w_data = n_data / (n_data + self.mix_k) if n_data > 0 else 0.0
-        share = w_data * m_data + (1 - w_data) * m_persona
+        share = _seed_lookup(cat_seed, persona_week, persona_bucket)
+        if share is None:
+            share = _seed_fallback(cat_seed, persona_week)
         return max(1.0, float(share))
 
     # Estimate number of people sharing and per‑person share
@@ -405,6 +445,11 @@ class DutchPayEngine:
         self.transactions.append(tx_obj)
         if not is_large:
             return None
+        # Mark large expenses so they are ignored when building future
+        # baselines.  This keeps confirmed dutch-pay expenses from raising the
+        # thresholds and suppressing subsequent detections for the same
+        # persona.
+        tx_obj["exclude_from_baseline"] = True
         # Estimate party size and per‑person share using baseline
         n_hat, s_hat = self._estimate_party(tx_amount, tx_dt, tx_category, baseline)
         # Minimum deposits required (n_hat - 1), bounded
@@ -471,16 +516,60 @@ class DutchPayEngine:
             # Deposit must be within share tolerance
             s_hat = cand["s_hat"]
             v = tx["amount"]
-            if v < s_hat * self.SHARE_TOL_LOW or v > s_hat * self.SHARE_TOL_HIGH:
-                continue
+            low = s_hat * self.SHARE_TOL_LOW
+            high = s_hat * self.SHARE_TOL_HIGH
+            if v < low or v > high:
+                # Try to infer a smaller party size when deposits are larger
+                # than expected.  This happens when the original share
+                # estimate (based purely on historical medians) is too low for
+                # the newly observed group size.  Use the deposit amount to
+                # re-estimate the per-person share and relax the minimum deposit
+                # requirement so settlements can complete.
+                inferred_n = int(round(pay_tx["amount"] / max(v, 1.0)))
+                inferred_n = max(2, min(self.PARTY_MAX, inferred_n))
+                inferred_share = pay_tx["amount"] / inferred_n if inferred_n else s_hat
+                inferred_low = inferred_share * self.SHARE_TOL_LOW
+                inferred_high = inferred_share * self.SHARE_TOL_HIGH
+                if v < inferred_low or v > inferred_high:
+                    continue
+                # Accept the deposit and update candidate expectations.
+                s_hat = inferred_share
+                cand["s_hat"] = s_hat
+                cand["n_hat"] = inferred_n
+                cand["min_reimb"] = max(1, min(inferred_n - 1, self.PARTY_MAX))
+                rho_star = (inferred_n - 1) / inferred_n
+                cand["ratio_bounds"] = (
+                    max(0.0, rho_star - self.RATIO_TOLERANCE),
+                    rho_star + self.RATIO_TOLERANCE
+                )
             # Accept deposit for this candidate
             cand["deposits"].append(tx)
             cand["sum_deposits"] += v
             self.used_deposits.add(tx["id"])
             # Evaluate if candidate is now confirmed
             cnt = len(cand["deposits"])
+            pay_amount = max(1.0, pay_tx["amount"])
+            # Re-estimate party size when the observed deposits imply a
+            # smaller group than originally predicted.  This helps scenarios
+            # where the seed-based share slightly underestimates the actual
+            # per-person amount (e.g. lunch vs. dinner), preventing the
+            # required deposit count and ratio bounds from remaining too
+            # strict.
+            avg_share = cand["sum_deposits"] / cnt if cnt else cand["s_hat"]
+            if avg_share > 0:
+                implied_n = int(round(pay_amount / avg_share))
+                implied_n = max(2, min(self.PARTY_MAX, implied_n))
+                if implied_n < cand["n_hat"]:
+                    cand["n_hat"] = implied_n
+                    cand["s_hat"] = pay_amount / implied_n
+                    cand["min_reimb"] = max(1, min(implied_n - 1, self.PARTY_MAX))
+                    rho_star = (implied_n - 1) / implied_n
+                    cand["ratio_bounds"] = (
+                        max(0.0, rho_star - self.RATIO_TOLERANCE),
+                        rho_star + self.RATIO_TOLERANCE
+                    )
             # Compute current ratio of reimbursements
-            ratio = cand["sum_deposits"] / max(1.0, pay_tx["amount"])
+            ratio = cand["sum_deposits"] / pay_amount
             lb, ub = cand["ratio_bounds"]
             # Check minimum count and ratio window
             if cnt >= cand["min_reimb"] and lb <= ratio <= ub:
@@ -493,6 +582,8 @@ class DutchPayEngine:
                         break
                 # Candidate confirmed
                 cand["state"] = "CONFIRMED"
+                # Ensure the payment never contributes to future baselines
+                pay_tx.setdefault("exclude_from_baseline", True)
                 adjusted_amount = max(0.0, pay_tx["amount"] - cand["sum_deposits"])
                 # Build settlement notification
                 settlement = {
@@ -517,12 +608,38 @@ class DutchPayEngine:
         return None
 
     def label_payment(self, payment_id: str, label: str):
-        # Store a user label for later analysis.  Does not affect logic.
+        """Apply a manual label to a candidate payment.
+
+        Returning ``True`` indicates that the payment existed.  A ``NO`` label
+        dismisses the candidate entirely so that future deposits no longer try
+        to match against it and any already-consumed reimbursements become
+        available for other candidates.  ``YES`` currently only records the
+        feedback for telemetry purposes.
+        """
+
         cand = self.candidates.get(payment_id)
-        if cand:
-            cand.setdefault("user_label", label)
-            return True
-        return False
+        if not cand:
+            return False
+
+        cand.setdefault("user_label", label)
+
+        if label == "NO":
+            # Release any deposits that may have been tentatively attributed to
+            # this candidate so they remain usable if another dutch-pay is
+            # active in the same window.
+            for dep in cand.get("deposits", []):
+                dep_id = dep.get("id")
+                if dep_id:
+                    self.used_deposits.discard(dep_id)
+            pay_tx = cand.get("payment") or {}
+            # Re-include the payment in future baselines since the user
+            # confirmed it was a solo expense.
+            pay_tx.pop("exclude_from_baseline", None)
+            cand["state"] = "DISMISSED"
+            # Remove the candidate entirely so it cannot interfere with other
+            # payments.
+            self.candidates.pop(payment_id, None)
+        return True
 
 ######################################################################
 # HTTP Handler
