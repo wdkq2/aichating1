@@ -38,6 +38,27 @@
       box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
     }
 
+    .cta-button {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: #fff;
+      border: none;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .cta-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 30px rgba(37, 99, 235, 0.32);
+    }
+
+    .cta-button:disabled {
+      opacity: 0.6;
+      cursor: default;
+      box-shadow: none;
+      transform: none;
+    }
+
     .avatar-ring {
       background: #d1d5db;
       border: 1px solid var(--border);
@@ -244,28 +265,16 @@
         const column=node.querySelector('[data-role="bubble-column"]');
         if(!column) return;
         const ui=document.createElement('div');
-        ui.className='mt-2 flex gap-2';
+        ui.className='mt-4 flex justify-center';
         const no=document.createElement('button');
-        no.className='px-3 py-1 rounded-lg border text-sm';
-        no.style.cssText='border-color:#e5e7eb; background:#fff';
+        no.className='px-5 py-2 rounded-full text-sm font-semibold cta-button';
         no.textContent='아니요 제가 샀어요!';
         ui.appendChild(no);
         column.appendChild(ui);
         function disable(){ no.disabled=true; }
         no.addEventListener('click',()=>labelPayment(ev.payment_id,false).then(disable));
       } else if(ev.type==='SETTLEMENT_COMPLETED'){
-        const node=bubbleBot(mapEventToText(ev));
-        const column=node.querySelector('[data-role="bubble-column"]');
-        if(!column) return;
-        const actionRow=document.createElement('div');
-        actionRow.className='mt-2 flex gap-2';
-        const correctBtn=document.createElement('button');
-        correctBtn.className='px-3 py-1 rounded-lg border text-sm';
-        correctBtn.style.cssText='border-color:#e5e7eb; background:#fff';
-        correctBtn.textContent='아니에요. 제가 샀어요!';
-        actionRow.appendChild(correctBtn);
-        column.appendChild(actionRow);
-        correctBtn.addEventListener('click',()=>labelPayment(ev.payment_id,false).then(()=>{ correctBtn.disabled=true; }));
+        bubbleBot(mapEventToText(ev));
       }
     }
     async function fetchPersonas(){ try{ const res=await fetch('/personas'); const data=await res.json(); const sel=document.getElementById('persona'); sel.innerHTML=''; (data.personas||[]).forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent=p.label; sel.appendChild(opt); }); const saved=localStorage.getItem('persona_id'); if(saved && (data.personas||[]).some(p=>p.id===saved)){ sel.value=saved; personaId=saved; } else if((data.personas||[]).length){ personaId=sel.value=(data.personas[0].id); localStorage.setItem('persona_id', personaId);} }catch(e){}}
