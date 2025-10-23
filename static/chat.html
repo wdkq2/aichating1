@@ -66,12 +66,23 @@
   </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-6 relative">
-  <div class="absolute top-4 left-4 sm:top-6 sm:left-6 z-10 flex flex-col gap-1 text-[12px] floating-panel rounded-xl px-3 py-2" style="color:var(--muted)">
-    <span class="tracking-wide text-[11px] font-semibold" style="letter-spacing:0.08em">페르소나</span>
-    <div class="flex items-center gap-2">
-      <select id="persona" class="px-2 py-1 rounded-md border bg-white text-[13px] w-36" style="border-color:var(--border); color:var(--text)"></select>
-      <button id="btn-refresh" class="px-2 py-1 rounded-md text-[12px] flex items-center gap-1 control-button" style="color:var(--text)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6M20 20v-6h-6 M20 9a8 8 0 1 0 2 5"/></svg> 새로고침</button>
+  <div class="absolute top-4 left-4 sm:top-6 sm:left-6 z-10 flex flex-col gap-3 text-[12px] floating-panel rounded-xl px-3 py-3" style="color:var(--muted)">
+    <div class="flex flex-col gap-1">
+      <span class="tracking-wide text-[11px] font-semibold" style="letter-spacing:0.08em">페르소나</span>
+      <div class="flex items-center gap-2">
+        <select id="persona" class="px-2 py-1 rounded-md border bg-white text-[13px] w-36" style="border-color:var(--border); color:var(--text)"></select>
+        <button id="btn-refresh" class="px-2 py-1 rounded-md text-[12px] flex items-center gap-1 control-button" style="color:var(--text)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6M20 20v-6h-6 M20 9a8 8 0 1 0 2 5"/></svg> 새로고침</button>
+      </div>
     </div>
+    <div class="flex flex-col gap-1">
+      <span class="tracking-wide text-[11px] font-semibold" style="letter-spacing:0.08em">프로필</span>
+      <div class="flex items-center gap-2 text-[12px]">
+        <button id="btn-bot-avatar" class="flex items-center gap-1 px-2 py-1 rounded-md control-button" style="color:var(--text)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z M8 14l3-4 3 4 2-3 4 6H6z M12 7v4 M10 9h4"/></svg> 상대</button>
+        <button id="btn-me-avatar" class="flex items-center gap-1 px-2 py-1 rounded-md control-button" style="color:var(--text)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z M8 14l3-4 3 4 2-3 4 6H6z M12 7v4 M10 9h4"/></svg> 나</button>
+      </div>
+    </div>
+    <input id="file-bot" type="file" accept="image/*" class="hidden" />
+    <input id="file-me" type="file" accept="image/*" class="hidden" />
   </div>
   <div class="w-[390px] h-[700px] md:h-[760px] rounded-3xl overflow-hidden shadow-xl flex flex-col relative bg-white" style="border:1px solid var(--border)">
     <header class="h-14 flex items-center justify-between border-b px-4" style="border-color:var(--border)">
@@ -93,13 +104,7 @@
       </div>
     </main>
     <div class="absolute left-0 right-0 bottom-0">
-      <div class="px-4 pb-4 space-y-3" style="background: var(--chatBg)">
-        <div class="flex items-center justify-end gap-2 text-[12px]" style="color:var(--muted)">
-          <button id="btn-bot-avatar" class="flex items-center gap-1 px-2 py-1 rounded-md text-xs control-button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z M8 14l3-4 3 4 2-3 4 6H6z M12 7v4 M10 9h4"/></svg> 상대</button>
-          <button id="btn-me-avatar" class="flex items-center gap-1 px-2 py-1 rounded-md text-xs control-button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z M8 14l3-4 3 4 2-3 4 6H6z M12 7v4 M10 9h4"/></svg> 나</button>
-          <input id="file-bot" type="file" accept="image/*" class="hidden" />
-          <input id="file-me" type="file" accept="image/*" class="hidden" />
-        </div>
+      <div class="px-4 pb-4" style="background: var(--chatBg)">
         <div class="flex items-center gap-2 p-2 rounded-2xl border bg-white" style="border-color:var(--border)">
           <input id="chat-input" class="flex-1 outline-none text-[16px] px-2 bg-transparent" placeholder="메시지를 입력하세요 (Enter 전송, Shift+Enter 줄바꿈)">
           <button id="btn-send" class="p-2 rounded-xl disabled:opacity-50 control-button" aria-label="전송"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/></svg></button>
@@ -240,19 +245,13 @@
         if(!column) return;
         const ui=document.createElement('div');
         ui.className='mt-2 flex gap-2';
-        const yes=document.createElement('button');
-        yes.className='px-3 py-1 rounded-lg border text-sm';
-        yes.style.cssText='border-color:#e5e7eb; background:#fff';
-        yes.textContent='네 맞아요!';
         const no=document.createElement('button');
         no.className='px-3 py-1 rounded-lg border text-sm';
         no.style.cssText='border-color:#e5e7eb; background:#fff';
         no.textContent='아니요 제가 샀어요!';
-        ui.appendChild(yes);
         ui.appendChild(no);
         column.appendChild(ui);
-        function disable(){ yes.disabled=true; no.disabled=true; }
-        yes.addEventListener('click',()=>labelPayment(ev.payment_id,true).then(disable));
+        function disable(){ no.disabled=true; }
         no.addEventListener('click',()=>labelPayment(ev.payment_id,false).then(disable));
       } else if(ev.type==='SETTLEMENT_COMPLETED'){
         const node=bubbleBot(mapEventToText(ev));
