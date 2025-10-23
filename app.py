@@ -494,8 +494,32 @@ class DutchPayEngine:
             # Deposit must be within share tolerance
             s_hat = cand["s_hat"]
             v = tx["amount"]
-            if v < s_hat * self.SHARE_TOL_LOW or v > s_hat * self.SHARE_TOL_HIGH:
-                continue
+            low = s_hat * self.SHARE_TOL_LOW
+            high = s_hat * self.SHARE_TOL_HIGH
+            if v < low or v > high:
+                # Try to infer a smaller party size when deposits are larger
+                # than expected.  This happens when the original share
+                # estimate (based purely on historical medians) is too low for
+                # the newly observed group size.  Use the deposit amount to
+                # re-estimate the per-person share and relax the minimum deposit
+                # requirement so settlements can complete.
+                inferred_n = int(round(pay_tx["amount"] / max(v, 1.0)))
+                inferred_n = max(2, min(self.PARTY_MAX, inferred_n))
+                inferred_share = pay_tx["amount"] / inferred_n if inferred_n else s_hat
+                inferred_low = inferred_share * self.SHARE_TOL_LOW
+                inferred_high = inferred_share * self.SHARE_TOL_HIGH
+                if v < inferred_low or v > inferred_high:
+                    continue
+                # Accept the deposit and update candidate expectations.
+                s_hat = inferred_share
+                cand["s_hat"] = s_hat
+                cand["n_hat"] = inferred_n
+                cand["min_reimb"] = max(1, min(inferred_n - 1, self.PARTY_MAX))
+                rho_star = (inferred_n - 1) / inferred_n
+                cand["ratio_bounds"] = (
+                    max(0.0, rho_star - self.RATIO_TOLERANCE),
+                    rho_star + self.RATIO_TOLERANCE
+                )
             # Accept deposit for this candidate
             cand["deposits"].append(tx)
             cand["sum_deposits"] += v
