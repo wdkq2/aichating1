@@ -632,9 +632,13 @@ class DutchPayEngine:
                 if dep_id:
                     self.used_deposits.discard(dep_id)
             pay_tx = cand.get("payment") or {}
-            # Re-include the payment in future baselines since the user
-            # confirmed it was a solo expense.
-            pay_tx.pop("exclude_from_baseline", None)
+            # Remove the expense from the transaction history entirely so it
+            # does not influence future baselines or party-size estimation.
+            pay_id = pay_tx.get("id")
+            if pay_id:
+                self.transactions = [
+                    tx for tx in self.transactions if tx.get("id") != pay_id
+                ]
             cand["state"] = "DISMISSED"
             # Remove the candidate entirely so it cannot interfere with other
             # payments.
