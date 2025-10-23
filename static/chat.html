@@ -158,7 +158,7 @@
         const place=formatCategoryKorean(payload.category);
         const amount=(payload.amount_krw||0).toLocaleString();
         const datetime=formatPromptDatetime(payload.datetime);
-        return `방금 ${place}에서 결제하셨네요! 더치페이 정산 하실꺼죠?\n결제금액 : ${amount}원\n결제일시 : ${datetime}`;
+        return `방금 ${place}에서 결제하셨네요!\n더치페이 정산 하실꺼죠?\n결제금액 : ${amount}원\n결제일시 : ${datetime}\n제가 알아서 더치페이로 처리할게요!`;
       }
       if(ev.type==='SETTLEMENT_COMPLETED'){
         return `정산 완료 🎉\n총액: ${(ev.payload.amount_krw||0).toLocaleString()}원\n추정 인원: ${ev.payload.party_size_estimated}명 (1인당≈${(ev.payload.expected_share_estimated||0).toLocaleString()}원)\n입금 ${ev.payload.deposits_count}건 / 합계${(ev.payload.deposits_total||0).toLocaleString()}원\n조정액: ${(ev.payload.adjusted_amount||0).toLocaleString()}원`;
@@ -185,7 +185,16 @@
         yes.addEventListener('click',()=>labelPayment(ev.payment_id,true).then(disable));
         no.addEventListener('click',()=>labelPayment(ev.payment_id,false).then(disable));
       } else if(ev.type==='SETTLEMENT_COMPLETED'){
-        bubbleBot(mapEventToText(ev));
+        const node=bubbleBot(mapEventToText(ev));
+        const actionRow=document.createElement('div');
+        actionRow.className='mt-2 flex gap-2';
+        const correctBtn=document.createElement('button');
+        correctBtn.className='px-3 py-1 rounded-lg border text-sm';
+        correctBtn.style.cssText='border-color:#e5e7eb; background:#fff';
+        correctBtn.textContent='아니에요. 제가 샀어요!';
+        actionRow.appendChild(correctBtn);
+        node.querySelector('.max-w-\\[76\%\\]').appendChild(actionRow);
+        correctBtn.addEventListener('click',()=>labelPayment(ev.payment_id,false).then(()=>{ correctBtn.disabled=true; }));
       }
     }
     async function fetchPersonas(){ try{ const res=await fetch('/personas'); const data=await res.json(); const sel=document.getElementById('persona'); sel.innerHTML=''; (data.personas||[]).forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent=p.label; sel.appendChild(opt); }); const saved=localStorage.getItem('persona_id'); if(saved && (data.personas||[]).some(p=>p.id===saved)){ sel.value=saved; personaId=saved; } else if((data.personas||[]).length){ personaId=sel.value=(data.personas[0].id); localStorage.setItem('persona_id', personaId);} }catch(e){}}
@@ -199,7 +208,7 @@
     document.getElementById('chat-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); document.getElementById('btn-send').click(); }});
     document.getElementById('btn-refresh').addEventListener('click', ()=> fetchPersonas());
     document.getElementById('persona').addEventListener('change', (e)=>{ personaId=e.target.value; localStorage.setItem('persona_id', personaId); lastEventId=0; const nodes=Array.from(logEl.children).slice(1); nodes.forEach(n=>n.remove()); pollEvents(); });
-    function runTests(){ const t0=new Date(2020,0,1,0,5,9); console.assert(formatKRTimestamp(t0).startsWith('오전 12:05:09'),'timestamp midnight failed'); const t1=new Date(2020,0,1,12,30,0); console.assert(formatKRTimestamp(t1).startsWith('오후 12:30:00'),'timestamp noon failed'); const fakePrompt={type:'CANDIDATE_PROMPT',payment_id:'tx1',payload:{title:'방금 결제하신 것은 더치페이인가요?',category:'restaurants',amount_krw:120000,datetime:'2025-10-13 19:30 (KST)',actions:[]}}; const fakeSettle={type:'SETTLEMENT_COMPLETED',payment_id:'tx1',payload:{title:'더치페이 정산이 완료되었습니다!',category:'restaurants',amount_krw:120000,datetime:'2025-10-13 20:30 (KST)',party_size_estimated:4,expected_share_estimated:30000,deposits_count:3,deposits_total:120000,adjusted_amount:0}}; const promptText=mapEventToText(fakePrompt); console.assert(promptText.includes('방금 식당에서 결제하셨네요'),'mapEventToText prompt category failed'); console.assert(promptText.includes('결제일시 : 2025년 10월 13일 19시 30분'),'mapEventToText prompt datetime failed'); console.assert(mapEventToText(fakeSettle).includes('정산 완료'),'mapEventToText settle failed'); console.log('%c[chat.html tests] OK','color:green'); }
+    function runTests(){ const t0=new Date(2020,0,1,0,5,9); console.assert(formatKRTimestamp(t0).startsWith('오전 12:05:09'),'timestamp midnight failed'); const t1=new Date(2020,0,1,12,30,0); console.assert(formatKRTimestamp(t1).startsWith('오후 12:30:00'),'timestamp noon failed'); const fakePrompt={type:'CANDIDATE_PROMPT',payment_id:'tx1',payload:{title:'방금 결제하신 것은 더치페이인가요?',category:'restaurants',amount_krw:120000,datetime:'2025-10-13 19:30 (KST)',actions:[]}}; const fakeSettle={type:'SETTLEMENT_COMPLETED',payment_id:'tx1',payload:{title:'더치페이 정산이 완료되었습니다!',category:'restaurants',amount_krw:120000,datetime:'2025-10-13 20:30 (KST)',party_size_estimated:4,expected_share_estimated:30000,deposits_count:3,deposits_total:120000,adjusted_amount:0}}; const promptText=mapEventToText(fakePrompt); console.assert(promptText.includes('방금 식당에서 결제하셨네요!\n더치페이 정산 하실꺼죠?\n결제금액 : 120,000원\n결제일시 : 2025년 10월 13일 19시 30분\n제가 알아서 더치페이로 처리할게요!'),'mapEventToText prompt format failed'); console.assert(mapEventToText(fakeSettle).includes('정산 완료'),'mapEventToText settle failed'); console.log('%c[chat.html tests] OK','color:green'); }
     document.addEventListener('DOMContentLoaded', async ()=>{ await fetchPersonas(); runTests(); pollEvents(); setInterval(pollEvents, 1200); });
   </script>
 </body>
