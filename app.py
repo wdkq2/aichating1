@@ -240,8 +240,26 @@ class DutchPayEngine:
         amounts = []
         ctx_vals = {}
         _ = max([tx["datetime"] for tx in self.transactions] or [datetime.now(timezone.utc)])
+        # Gather known candidate payment ids so we can exclude them from the
+        # baseline even if they predate the "exclude_from_baseline" flag (for
+        # example transactions recorded before the v3.1.1 patch).  This keeps
+        # long-running servers consistent after upgrades.
+        excluded_ids = {
+            pid
+            for cand in self.candidates.values()
+            for pid in [cand.get("payment", {}).get("id")]
+            if pid and cand.get("state") in {"CANDIDATE", "CONFIRMED"}
+        }
         for tx in self.transactions:
             if tx.get("type") != "deposit" and tx.get("amount", 0) > 0:
+                # Exclude transactions that have been marked as dutch-pay
+                # candidates/confirmed settlements from the baseline so that
+                # exceptionally large group payments do not inflate the
+                # personal spending profile.  Without this guard, a confirmed
+                # dutch-pay would double the effective median, preventing the
+                # next legitimate candidate from being detected.
+                if tx.get("exclude_from_baseline") or tx.get("id") in excluded_ids:
+                    continue
                 # We do not apply a lookback cutoff here; the engine may be
                 # extended with lookback in future
                 amt = float(tx["amount"])
@@ -405,6 +423,11 @@ class DutchPayEngine:
         self.transactions.append(tx_obj)
         if not is_large:
             return None
+        # Mark large expenses so they are ignored when building future
+        # baselines.  This keeps confirmed dutch-pay expenses from raising the
+        # thresholds and suppressing subsequent detections for the same
+        # persona.
+        tx_obj["exclude_from_baseline"] = True
         # Estimate party size and per‑person share using baseline
         n_hat, s_hat = self._estimate_party(tx_amount, tx_dt, tx_category, baseline)
         # Minimum deposits required (n_hat - 1), bounded
@@ -471,8 +494,32 @@ class DutchPayEngine:
             # Deposit must be within share tolerance
             s_hat = cand["s_hat"]
             v = tx["amount"]
-            if v < s_hat * self.SHARE_TOL_LOW or v > s_hat * self.SHARE_TOL_HIGH:
-                continue
+            low = s_hat * self.SHARE_TOL_LOW
+            high = s_hat * self.SHARE_TOL_HIGH
+            if v < low or v > high:
+                # Try to infer a smaller party size when deposits are larger
+                # than expected.  This happens when the original share
+                # estimate (based purely on historical medians) is too low for
+                # the newly observed group size.  Use the deposit amount to
+                # re-estimate the per-person share and relax the minimum deposit
+                # requirement so settlements can complete.
+                inferred_n = int(round(pay_tx["amount"] / max(v, 1.0)))
+                inferred_n = max(2, min(self.PARTY_MAX, inferred_n))
+                inferred_share = pay_tx["amount"] / inferred_n if inferred_n else s_hat
+                inferred_low = inferred_share * self.SHARE_TOL_LOW
+                inferred_high = inferred_share * self.SHARE_TOL_HIGH
+                if v < inferred_low or v > inferred_high:
+                    continue
+                # Accept the deposit and update candidate expectations.
+                s_hat = inferred_share
+                cand["s_hat"] = s_hat
+                cand["n_hat"] = inferred_n
+                cand["min_reimb"] = max(1, min(inferred_n - 1, self.PARTY_MAX))
+                rho_star = (inferred_n - 1) / inferred_n
+                cand["ratio_bounds"] = (
+                    max(0.0, rho_star - self.RATIO_TOLERANCE),
+                    rho_star + self.RATIO_TOLERANCE
+                )
             # Accept deposit for this candidate
             cand["deposits"].append(tx)
             cand["sum_deposits"] += v
@@ -493,6 +540,8 @@ class DutchPayEngine:
                         break
                 # Candidate confirmed
                 cand["state"] = "CONFIRMED"
+                # Ensure the payment never contributes to future baselines
+                pay_tx.setdefault("exclude_from_baseline", True)
                 adjusted_amount = max(0.0, pay_tx["amount"] - cand["sum_deposits"])
                 # Build settlement notification
                 settlement = {
