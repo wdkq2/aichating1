@@ -152,6 +152,7 @@
       avatarImg.src=botAvatar;
       avatarImg.alt='avatar';
       avatarImg.className='w-full h-full object-cover';
+      avatarImg.setAttribute('data-avatar-role','bot');
       avatar.appendChild(avatarImg);
 
       const column=document.createElement('div');
@@ -203,6 +204,7 @@
       avatarImg.src=meAvatar;
       avatarImg.alt='avatar';
       avatarImg.className='w-full h-full object-cover';
+      avatarImg.setAttribute('data-avatar-role','me');
       avatar.appendChild(avatarImg);
 
       wrap.appendChild(column);
@@ -277,13 +279,18 @@
         bubbleBot(mapEventToText(ev));
       }
     }
+    function refreshAvatarImages(role, src){
+      document.querySelectorAll(`img[data-avatar-role="${role}"]`).forEach(img=>{
+        img.src=src;
+      });
+    }
     async function fetchPersonas(){ try{ const res=await fetch('/personas'); const data=await res.json(); const sel=document.getElementById('persona'); sel.innerHTML=''; (data.personas||[]).forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent=p.label; sel.appendChild(opt); }); const saved=localStorage.getItem('persona_id'); if(saved && (data.personas||[]).some(p=>p.id===saved)){ sel.value=saved; personaId=saved; } else if((data.personas||[]).length){ personaId=sel.value=(data.personas[0].id); localStorage.setItem('persona_id', personaId);} }catch(e){}}
     async function pollEvents(){ if(!personaId) return; try{ const res=await fetch(`/events?persona_id=${encodeURIComponent(personaId)}&after=${lastEventId}`); const data=await res.json(); (data.events||[]).forEach(ev=>{ lastEventId=Math.max(lastEventId, ev.event_id||0); handleServerEvent(ev); }); }catch(e){}}
     async function labelPayment(paymentId, yes){ try{ const res=await fetch(`/payments/${encodeURIComponent(paymentId)}/label`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({label: yes?'YES':'NO'}) }); const data=await res.json(); return data.status==='ok'; } catch(e){ return false; } }
     document.getElementById('btn-bot-avatar').addEventListener('click', ()=> document.getElementById('file-bot').click());
     document.getElementById('btn-me-avatar').addEventListener('click', ()=> document.getElementById('file-me').click());
-    document.getElementById('file-bot').addEventListener('change', async (e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; botAvatar=await readAsDataURL(f); e.target.value=''; });
-    document.getElementById('file-me').addEventListener('change', async (e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; meAvatar=await readAsDataURL(f); e.target.value=''; });
+    document.getElementById('file-bot').addEventListener('change', async (e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; botAvatar=await readAsDataURL(f); refreshAvatarImages('bot', botAvatar); e.target.value=''; });
+    document.getElementById('file-me').addEventListener('change', async (e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; meAvatar=await readAsDataURL(f); refreshAvatarImages('me', meAvatar); e.target.value=''; });
     document.getElementById('btn-send').addEventListener('click', ()=>{ const input=document.getElementById('chat-input'); const t=(input.value||'').trim(); if(!t) return; bubbleMe(t); input.value=''; });
     document.getElementById('chat-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); document.getElementById('btn-send').click(); }});
     document.getElementById('btn-refresh').addEventListener('click', ()=> fetchPersonas());
