@@ -6,7 +6,7 @@
   <title>AI톡 스타일 채팅</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root {{
+    :root {
       --appBg: #ffffff;
       --chatBg: #f7f8fa;
       --bubble: #ffffff;
@@ -15,15 +15,80 @@
       --text: #111827;
       --muted: #9ca3af;
       --border: #e5e7eb;
-    }}
+    }
+
+    body {
+      font-family: "Noto Sans KR", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      background: var(--appBg);
+      color: var(--text);
+    }
+
+    button, select, input {
+      font-family: inherit;
+    }
+
+    .control-button {
+      background: #fff;
+      border: 1px solid var(--border);
+      transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .control-button:hover {
+      background: #f3f4f6;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    }
+
+    .avatar-ring {
+      background: #d1d5db;
+      border: 1px solid var(--border);
+    }
+
+    .bubble-base {
+      border: 1px solid var(--border);
+      box-shadow: 0 6px 18px rgba(17, 24, 39, 0.08);
+      line-height: 1.75rem;
+      font-size: 17px;
+      color: var(--text);
+      white-space: pre-line;
+    }
+
+    .timestamp {
+      color: var(--muted);
+    }
+
+    .floating-panel {
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--border);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
+    }
   </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-6" style="background: var(--appBg)">
-  <div class="w-[390px] rounded-3xl overflow-hidden shadow-xl flex flex-col relative bg-white" style="border:1px solid var(--border)">
-    <header class="h-14 flex items-center justify-between border-b px-2" style="border-color:var(--border)">
+<body class="min-h-screen flex items-center justify-center p-6 relative">
+  <div class="absolute top-4 left-4 sm:top-6 sm:left-6 z-10 flex flex-col gap-3 text-[12px] floating-panel rounded-xl px-3 py-3" style="color:var(--muted)">
+    <div class="flex flex-col gap-1">
+      <span class="tracking-wide text-[11px] font-semibold" style="letter-spacing:0.08em">페르소나</span>
+      <div class="flex items-center gap-2">
+        <select id="persona" class="px-2 py-1 rounded-md border bg-white text-[13px] w-36" style="border-color:var(--border); color:var(--text)"></select>
+        <button id="btn-refresh" class="px-2 py-1 rounded-md text-[12px] flex items-center gap-1 control-button" style="color:var(--text)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6M20 20v-6h-6 M20 9a8 8 0 1 0 2 5"/></svg> 새로고침</button>
+      </div>
+    </div>
+    <div class="flex flex-col gap-1">
+      <span class="tracking-wide text-[11px] font-semibold" style="letter-spacing:0.08em">프로필</span>
+      <div class="flex items-center gap-2 text-[12px]">
+        <button id="btn-bot-avatar" class="flex items-center gap-1 px-2 py-1 rounded-md control-button" style="color:var(--text)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z M8 14l3-4 3 4 2-3 4 6H6z M12 7v4 M10 9h4"/></svg> 상대</button>
+        <button id="btn-me-avatar" class="flex items-center gap-1 px-2 py-1 rounded-md control-button" style="color:var(--text)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z M8 14l3-4 3 4 2-3 4 6H6z M12 7v4 M10 9h4"/></svg> 나</button>
+      </div>
+    </div>
+    <input id="file-bot" type="file" accept="image/*" class="hidden" />
+    <input id="file-me" type="file" accept="image/*" class="hidden" />
+  </div>
+  <div class="w-[390px] h-[700px] md:h-[760px] rounded-3xl overflow-hidden shadow-xl flex flex-col relative bg-white" style="border:1px solid var(--border)">
+    <header class="h-14 flex items-center justify-between border-b px-4" style="border-color:var(--border)">
       <button class="p-2 text-gray-800" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg></button>
       <div class="flex items-center gap-1 text-gray-900 font-semibold">
-        <span class="text-base">AI톡</span>
+        <span class="text-base">농협은행 AI톡</span>
         <span class="opacity-80"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 16h-1v-4h-1m1-4h.01"/></svg></span>
       </div>
       <div class="flex items-center gap-1 text-gray-800">
@@ -32,27 +97,17 @@
       </div>
     </header>
     <main id="scroll-area" class="flex-1" style="background: var(--chatBg)">
-      <div id="log" class="h-full overflow-y-auto px-4 pt-4 pb-48">
+      <div id="log" class="h-full overflow-y-auto px-5 pt-5 pb-32">
         <div class="mx-auto text-xs px-4 py-2 rounded-full w-max text-gray-700" style="background-color: var(--system)">
           AI톡과 대화를 시작합니다.
         </div>
       </div>
     </main>
     <div class="absolute left-0 right-0 bottom-0">
-      <div class="px-3 pb-3 space-y-2" style="background: var(--chatBg)">
-        <div class="flex items-center gap-2">
-          <span class="text-xs" style="color:var(--muted)">페르소나</span>
-          <select id="persona" class="text-[13px] px-2 py-1 rounded-md border bg-white" style="border-color:var(--border)"></select>
-          <button id="btn-refresh" class="px-2 py-1 rounded-md border text-xs flex items-center gap-1" style="border-color:var(--border); background:#fff"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6M20 20v-6h-6 M20 9a8 8 0 1 0 2 5"/></svg> 새로고침</button>
-          <span class="flex-1"></span>
-          <button id="btn-bot-avatar" class="flex items-center gap-1 px-2 py-1 rounded-md border text-xs" style="border-color:var(--border); background:#fff"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z M8 14l3-4 3 4 2-3 4 6H6z M12 7v4 M10 9h4"/></svg> 상대</button>
-          <button id="btn-me-avatar" class="flex items-center gap-1 px-2 py-1 rounded-md border text-xs" style="border-color:var(--border); background:#fff"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z M8 14l3-4 3 4 2-3 4 6H6z M12 7v4 M10 9h4"/></svg> 나</button>
-          <input id="file-bot" type="file" accept="image/*" class="hidden" />
-          <input id="file-me" type="file" accept="image/*" class="hidden" />
-        </div>
+      <div class="px-4 pb-4" style="background: var(--chatBg)">
         <div class="flex items-center gap-2 p-2 rounded-2xl border bg-white" style="border-color:var(--border)">
           <input id="chat-input" class="flex-1 outline-none text-[16px] px-2 bg-transparent" placeholder="메시지를 입력하세요 (Enter 전송, Shift+Enter 줄바꿈)">
-          <button id="btn-send" class="p-2 rounded-xl border disabled:opacity-50" style="border-color:var(--border); background:#fff" aria-label="전송"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/></svg></button>
+          <button id="btn-send" class="p-2 rounded-xl disabled:opacity-50 control-button" aria-label="전송"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/></svg></button>
         </div>
       </div>
     </div>
@@ -66,16 +121,153 @@
     function nowKR(){ return new Date(); }
     function formatKRTimestamp(d){ const h=d.getHours(); const m=String(d.getMinutes()).padStart(2,'0'); const s=String(d.getSeconds()).padStart(2,'0'); const noon=h>=12?'오후':'오전'; const hour12=((h+11)%12)+1; return `${noon} ${hour12}:${m}:${s}`;}
     async function readAsDataURL(file){ return await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(String(fr.result)); fr.onerror=rej; fr.readAsDataURL(file); }); }
-    function bubbleBot(text){ const wrap=document.createElement('div'); wrap.className='mt-5 flex items-start gap-3'; wrap.innerHTML=`
-      <div class="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center ring-1" style="background:#d1d5db; border-color:#e5e7eb"><img src="${botAvatar}" class="w-full h-full object-cover" alt="avatar"/></div>
-      <div class="max-w-[76%]"><div class="px-4 py-3 rounded-2xl shadow-sm text-[17px] leading-7 border" style="background:#fff; color:#111827; border-color:#e5e7eb">${text}</div>
-      <div class="mt-2 pr-1 text-right text-[12px]" style="color:#9ca3af">${formatKRTimestamp(nowKR())}</div></div>`; logEl.appendChild(wrap); keepScrolledBottom(); return wrap; }
-    function bubbleMe(text){ const wrap=document.createElement('div'); wrap.className='mt-4 flex items-start gap-3 justify-end'; wrap.innerHTML=`
-      <div class="max-w-[76%]"><div class="px-4 py-3 rounded-2xl shadow-sm text-[17px] leading-7 border" style="background:#f9fafb; color:#111827; border-color:#e5e7eb">${text}</div>
-      <div class="mt-2 pl-1 text-left text-[12px]" style="color:#9ca3af">${formatKRTimestamp(nowKR())}</div></div>
-      <div class="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center ring-1" style="background:#d1d5db; border-color:#e5e7eb"><img src="${meAvatar}" class="w-full h-full object-cover" alt="avatar"/></div>`; logEl.appendChild(wrap); keepScrolledBottom(); return wrap; }
-    function mapEventToText(ev){ if(ev.type==='CANDIDATE_PROMPT'){ return `해당 결제 건은 더치페이로 보여요!\n금액: ${(ev.payload.amount_krw||0).toLocaleString()}원\n시간: ${ev.payload.datetime}\n카테고리: ${ev.payload.category}`; } if(ev.type==='SETTLEMENT_COMPLETED'){ return `정산 완료 🎉\n총액: ${(ev.payload.amount_krw||0).toLocaleString()}원\n추정 인원: ${ev.payload.party_size_estimated}명 (1인당≈${(ev.payload.expected_share_estimated||0).toLocaleString()}원)\n입금 ${ev.payload.deposits_count}건 / 합계 ${(ev.payload.deposits_total||0).toLocaleString()}원\n조정액: ${(ev.payload.adjusted_amount||0).toLocaleString()}원`; } return JSON.stringify(ev); }
-    function handleServerEvent(ev){ if(ev.type==='CANDIDATE_PROMPT'){ const node=bubbleBot(mapEventToText(ev)); const ui=document.createElement('div'); ui.className='mt-2 flex gap-2'; const yes=document.createElement('button'); yes.className='px-3 py-1 rounded-lg border text-sm'; yes.style.cssText='border-color:#e5e7eb; background:#fff'; yes.textContent='예 (라벨 YES)'; const no=document.createElement('button'); no.className='px-3 py-1 rounded-lg border text-sm'; no.style.cssText='border-color:#e5e7eb; background:#fff'; no.textContent='아니오 (라벨 NO)'; ui.appendChild(yes); ui.appendChild(no); node.querySelector('.max-w-\\[76\\%\\]').appendChild(ui); function disable(){ yes.disabled=true; no.disabled=true; } yes.addEventListener('click',()=>labelPayment(ev.payment_id,true).then(disable)); no.addEventListener('click',()=>labelPayment(ev.payment_id,false).then(disable)); } else if(ev.type==='SETTLEMENT_COMPLETED'){ bubbleBot(mapEventToText(ev)); } }
+    function bubbleBot(text){
+      const wrap=document.createElement('div');
+      wrap.className='mt-5 flex items-start gap-3';
+
+      const avatar=document.createElement('div');
+      avatar.className='w-12 h-12 rounded-full overflow-hidden flex items-center justify-center avatar-ring';
+      const avatarImg=document.createElement('img');
+      avatarImg.src=botAvatar;
+      avatarImg.alt='avatar';
+      avatarImg.className='w-full h-full object-cover';
+      avatar.appendChild(avatarImg);
+
+      const column=document.createElement('div');
+      column.className='max-w-[76%]';
+      column.setAttribute('data-role','bubble-column');
+
+      const bubble=document.createElement('div');
+      bubble.className='px-4 py-3 rounded-2xl bubble-base';
+      bubble.style.background='var(--bubble)';
+      bubble.setAttribute('data-role','bubble-text');
+      bubble.textContent=text;
+
+      const stamp=document.createElement('div');
+      stamp.className='mt-2 pr-1 text-right text-[12px] timestamp';
+      stamp.textContent=formatKRTimestamp(nowKR());
+
+      column.appendChild(bubble);
+      column.appendChild(stamp);
+      wrap.appendChild(avatar);
+      wrap.appendChild(column);
+      logEl.appendChild(wrap);
+      keepScrolledBottom();
+      return wrap;
+    }
+    function bubbleMe(text){
+      const wrap=document.createElement('div');
+      wrap.className='mt-4 flex items-start gap-3 justify-end';
+
+      const column=document.createElement('div');
+      column.className='max-w-[76%]';
+      column.setAttribute('data-role','bubble-column');
+
+      const bubble=document.createElement('div');
+      bubble.className='px-4 py-3 rounded-2xl bubble-base';
+      bubble.style.background='var(--bubbleMe)';
+      bubble.setAttribute('data-role','bubble-text');
+      bubble.textContent=text;
+
+      const stamp=document.createElement('div');
+      stamp.className='mt-2 pl-1 text-left text-[12px] timestamp';
+      stamp.textContent=formatKRTimestamp(nowKR());
+
+      column.appendChild(bubble);
+      column.appendChild(stamp);
+
+      const avatar=document.createElement('div');
+      avatar.className='w-12 h-12 rounded-full overflow-hidden flex items-center justify-center avatar-ring';
+      const avatarImg=document.createElement('img');
+      avatarImg.src=meAvatar;
+      avatarImg.alt='avatar';
+      avatarImg.className='w-full h-full object-cover';
+      avatar.appendChild(avatarImg);
+
+      wrap.appendChild(column);
+      wrap.appendChild(avatar);
+      logEl.appendChild(wrap);
+      keepScrolledBottom();
+      return wrap;
+    }
+    function formatPromptDatetime(raw){
+      if(!raw) return '';
+      const regex=/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/;
+      const m=raw.match(regex);
+      if(m){
+        const [,yy,mm,dd,hh,mi]=m;
+        return `${yy}년 ${Number(mm)}월 ${Number(dd)}일 ${Number(hh)}시 ${Number(mi)}분`;
+      }
+      const parsed=new Date(raw);
+      if(!Number.isNaN(parsed.getTime())){
+        const yy=parsed.getFullYear();
+        const mm=parsed.getMonth()+1;
+        const dd=parsed.getDate();
+        const hh=parsed.getHours();
+        const mi=parsed.getMinutes();
+        return `${yy}년 ${mm}월 ${dd}일 ${hh}시 ${mi}분`;
+      }
+      return raw;
+    }
+    function formatCategoryKorean(category){
+      const key=(category||'').toLowerCase();
+      if(key==='restaurants' || key==='restaurant'){
+        return '식당';
+      }
+      if(key==='cafes' || key==='cafe'){
+        return '카페';
+      }
+      return category || '매장';
+    }
+    function mapEventToText(ev){
+      if(ev.type==='CANDIDATE_PROMPT'){
+        const payload=ev.payload||{};
+        const place=formatCategoryKorean(payload.category);
+        const amount=(payload.amount_krw||0).toLocaleString();
+        const datetime=formatPromptDatetime(payload.datetime);
+        return `방금 ${place}에서 결제하셨네요!\n더치페이 정산 하실꺼죠?\n결제금액 : ${amount}원\n결제일시 : ${datetime}\n제가 알아서 더치페이로 처리할게요!`;
+      }
+      if(ev.type==='SETTLEMENT_COMPLETED'){
+        const payload=ev.payload||{};
+        const total=(payload.amount_krw||0).toLocaleString();
+        const depositCount=typeof payload.deposits_count==='number'?payload.deposits_count:0;
+        const depositTotal=(payload.deposits_total||0).toLocaleString();
+        const adjustedRaw=typeof payload.adjusted_amount==='number'?payload.adjusted_amount:(payload.amount_krw||0)-(payload.deposits_total||0);
+        const actual=Math.max(0, Math.round(adjustedRaw)).toLocaleString();
+        return `정산 완료 🎉\n총액 : ${total}원\n입금 인원 : ${depositCount}명\n입금 총액 : ${depositTotal}원\n실제 소비금액 : ${actual}원\n제가 소비/지출 데이터를 맞게 수정했어요!`;
+      }
+      return JSON.stringify(ev);
+    }
+    function handleServerEvent(ev){
+      if(ev.type==='CANDIDATE_PROMPT'){
+        const node=bubbleBot(mapEventToText(ev));
+        const column=node.querySelector('[data-role="bubble-column"]');
+        if(!column) return;
+        const ui=document.createElement('div');
+        ui.className='mt-2 flex gap-2';
+        const no=document.createElement('button');
+        no.className='px-3 py-1 rounded-lg border text-sm';
+        no.style.cssText='border-color:#e5e7eb; background:#fff';
+        no.textContent='아니요 제가 샀어요!';
+        ui.appendChild(no);
+        column.appendChild(ui);
+        function disable(){ no.disabled=true; }
+        no.addEventListener('click',()=>labelPayment(ev.payment_id,false).then(disable));
+      } else if(ev.type==='SETTLEMENT_COMPLETED'){
+        const node=bubbleBot(mapEventToText(ev));
+        const column=node.querySelector('[data-role="bubble-column"]');
+        if(!column) return;
+        const actionRow=document.createElement('div');
+        actionRow.className='mt-2 flex gap-2';
+        const correctBtn=document.createElement('button');
+        correctBtn.className='px-3 py-1 rounded-lg border text-sm';
+        correctBtn.style.cssText='border-color:#e5e7eb; background:#fff';
+        correctBtn.textContent='아니에요. 제가 샀어요!';
+        actionRow.appendChild(correctBtn);
+        column.appendChild(actionRow);
+        correctBtn.addEventListener('click',()=>labelPayment(ev.payment_id,false).then(()=>{ correctBtn.disabled=true; }));
+      }
+    }
     async function fetchPersonas(){ try{ const res=await fetch('/personas'); const data=await res.json(); const sel=document.getElementById('persona'); sel.innerHTML=''; (data.personas||[]).forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent=p.label; sel.appendChild(opt); }); const saved=localStorage.getItem('persona_id'); if(saved && (data.personas||[]).some(p=>p.id===saved)){ sel.value=saved; personaId=saved; } else if((data.personas||[]).length){ personaId=sel.value=(data.personas[0].id); localStorage.setItem('persona_id', personaId);} }catch(e){}}
     async function pollEvents(){ if(!personaId) return; try{ const res=await fetch(`/events?persona_id=${encodeURIComponent(personaId)}&after=${lastEventId}`); const data=await res.json(); (data.events||[]).forEach(ev=>{ lastEventId=Math.max(lastEventId, ev.event_id||0); handleServerEvent(ev); }); }catch(e){}}
     async function labelPayment(paymentId, yes){ try{ const res=await fetch(`/payments/${encodeURIComponent(paymentId)}/label`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({label: yes?'YES':'NO'}) }); const data=await res.json(); return data.status==='ok'; } catch(e){ return false; } }
@@ -87,7 +279,7 @@
     document.getElementById('chat-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); document.getElementById('btn-send').click(); }});
     document.getElementById('btn-refresh').addEventListener('click', ()=> fetchPersonas());
     document.getElementById('persona').addEventListener('change', (e)=>{ personaId=e.target.value; localStorage.setItem('persona_id', personaId); lastEventId=0; const nodes=Array.from(logEl.children).slice(1); nodes.forEach(n=>n.remove()); pollEvents(); });
-    function runTests(){ const t0=new Date(2020,0,1,0,5,9); console.assert(formatKRTimestamp(t0).startsWith('오전 12:05:09'),'timestamp midnight failed'); const t1=new Date(2020,0,1,12,30,0); console.assert(formatKRTimestamp(t1).startsWith('오후 12:30:00'),'timestamp noon failed'); const fakePrompt={type:'CANDIDATE_PROMPT',payment_id:'tx1',payload:{title:'방금 결제하신 것은 더치페이인가요?',category:'restaurants',amount_krw:120000,datetime:'2025-10-13 19:30 (KST)',actions:[]}}; const fakeSettle={type:'SETTLEMENT_COMPLETED',payment_id:'tx1',payload:{title:'더치페이 정산이 완료되었습니다!',category:'restaurants',amount_krw:120000,datetime:'2025-10-13 20:30 (KST)',party_size_estimated:4,expected_share_estimated:30000,deposits_count:3,deposits_total:120000,adjusted_amount:0}}; console.assert(mapEventToText(fakePrompt).includes('더치페이'),'mapEventToText prompt failed'); console.assert(mapEventToText(fakeSettle).includes('정산 완료'),'mapEventToText settle failed'); console.log('%c[chat.html tests] OK','color:green'); }
+    function runTests(){ const t0=new Date(2020,0,1,0,5,9); console.assert(formatKRTimestamp(t0).startsWith('오전 12:05:09'),'timestamp midnight failed'); const t1=new Date(2020,0,1,12,30,0); console.assert(formatKRTimestamp(t1).startsWith('오후 12:30:00'),'timestamp noon failed'); const fakePrompt={type:'CANDIDATE_PROMPT',payment_id:'tx1',payload:{title:'방금 결제하신 것은 더치페이인가요?',category:'restaurants',amount_krw:120000,datetime:'2025-10-13 19:30 (KST)',actions:[]}}; const fakeSettle={type:'SETTLEMENT_COMPLETED',payment_id:'tx1',payload:{title:'더치페이 정산이 완료되었습니다!',category:'restaurants',amount_krw:120000,datetime:'2025-10-13 20:30 (KST)',party_size_estimated:4,expected_share_estimated:30000,deposits_count:3,deposits_total:90000,adjusted_amount:30000}}; const promptText=mapEventToText(fakePrompt); console.assert(promptText.includes('방금 식당에서 결제하셨네요!\n더치페이 정산 하실꺼죠?\n결제금액 : 120,000원\n결제일시 : 2025년 10월 13일 19시 30분\n제가 알아서 더치페이로 처리할게요!'),'mapEventToText prompt format failed'); const settleText=mapEventToText(fakeSettle); console.assert(settleText.includes('정산 완료 🎉\n총액 : 120,000원\n입금 인원 : 3명\n입금 총액 : 90,000원\n실제 소비금액 : 30,000원\n제가 소비/지출 데이터를 맞게 수정했어요!'),'mapEventToText settle failed'); console.log('%c[chat.html tests] OK','color:green'); }
     document.addEventListener('DOMContentLoaded', async ()=>{ await fetchPersonas(); runTests(); pollEvents(); setInterval(pollEvents, 1200); });
   </script>
 </body>
