@@ -548,8 +548,28 @@ class DutchPayEngine:
             self.used_deposits.add(tx["id"])
             # Evaluate if candidate is now confirmed
             cnt = len(cand["deposits"])
+            pay_amount = max(1.0, pay_tx["amount"])
+            # Re-estimate party size when the observed deposits imply a
+            # smaller group than originally predicted.  This helps scenarios
+            # where the seed-based share slightly underestimates the actual
+            # per-person amount (e.g. lunch vs. dinner), preventing the
+            # required deposit count and ratio bounds from remaining too
+            # strict.
+            avg_share = cand["sum_deposits"] / cnt if cnt else cand["s_hat"]
+            if avg_share > 0:
+                implied_n = int(round(pay_amount / avg_share))
+                implied_n = max(2, min(self.PARTY_MAX, implied_n))
+                if implied_n < cand["n_hat"]:
+                    cand["n_hat"] = implied_n
+                    cand["s_hat"] = pay_amount / implied_n
+                    cand["min_reimb"] = max(1, min(implied_n - 1, self.PARTY_MAX))
+                    rho_star = (implied_n - 1) / implied_n
+                    cand["ratio_bounds"] = (
+                        max(0.0, rho_star - self.RATIO_TOLERANCE),
+                        rho_star + self.RATIO_TOLERANCE
+                    )
             # Compute current ratio of reimbursements
-            ratio = cand["sum_deposits"] / max(1.0, pay_tx["amount"])
+            ratio = cand["sum_deposits"] / pay_amount
             lb, ub = cand["ratio_bounds"]
             # Check minimum count and ratio window
             if cnt >= cand["min_reimb"] and lb <= ratio <= ub:
