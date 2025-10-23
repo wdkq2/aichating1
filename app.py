@@ -38,9 +38,9 @@ from datetime import datetime, timedelta, timezone
 # Persona definitions
 #
 # Each persona describes typical per‑person spend for the time bucket,
-# category and weekday/weekend.  The ``mix_k`` parameter controls how
-# quickly real data overrides the seed values (larger values favour the
-# persona seed when little data exists).
+# category and weekday/weekend.  The ``share_seed`` table now fully defines the
+# expected per-person share; ``mix_k`` is retained for backward compatibility
+# but new observations no longer alter these seed values.
 ######################################################################
 PERSONAS: dict = {
     "P1": {
@@ -339,25 +339,47 @@ class DutchPayEngine:
         return is_large, debug
 
     # Compute the expected per‑person share for a given time context and category.
-    # This blends the persona seed with observed data using the mix_k parameter.
+    # The value is derived exclusively from the persona's seed table so it remains
+    # stable regardless of newly observed transactions.
     def _compute_share(self, dt: datetime, category: str, baseline) -> float:
-        # Determine context key and fetch baseline median and count
-        key = f"{self._bucket_of(dt)}:{self._weektag(dt)}"
-        ctx = baseline["ctx"].get(key, {"median": baseline["global"]["median"], "count": 0})
-        m_data = ctx["median"]
-        n_data = ctx.get("count", 0)
-        # Persona seed for this context
-        seed_cat = self.share_seed.get(category, {})
-        # Fallback to global weekend/weekday if missing bucket
+        """Return the per-person share using only persona seed values.
+
+        Operational feedback should not modify the expected share; instead we
+        rely solely on the fixed seed tables defined for each persona.  The
+        ``baseline`` argument is still accepted for signature compatibility but
+        is no longer consulted when computing the share.
+        """
+
+        def _seed_lookup(cat_seed: dict, week: str, bucket: str):
+            val = cat_seed.get(week, {}).get(bucket)
+            return float(val) if val else None
+
+        def _seed_fallback(cat_seed: dict, week: str):
+            # Prefer other buckets in the same week, then all remaining seeds.
+            week_vals = [
+                float(v)
+                for v in cat_seed.get(week, {}).values()
+                if v and float(v) > 0
+            ]
+            if week_vals:
+                return sum(week_vals) / len(week_vals)
+            all_vals = [
+                float(v)
+                for week_map in cat_seed.values()
+                for v in week_map.values()
+                if v and float(v) > 0
+            ]
+            if all_vals:
+                return sum(all_vals) / len(all_vals)
+            # Final fallback: reasonable constant so detection can proceed.
+            return 15000.0
+
+        cat_seed = self.share_seed.get(category, {})
         persona_week = self._weektag(dt)
         persona_bucket = self._bucket_of(dt)
-        m_persona = seed_cat.get(persona_week, {}).get(persona_bucket)
-        if m_persona is None:
-            # If persona seed missing, fall back to global median
-            m_persona = baseline["global"]["median"]
-        # Weight between data and persona seed
-        w_data = n_data / (n_data + self.mix_k) if n_data > 0 else 0.0
-        share = w_data * m_data + (1 - w_data) * m_persona
+        share = _seed_lookup(cat_seed, persona_week, persona_bucket)
+        if share is None:
+            share = _seed_fallback(cat_seed, persona_week)
         return max(1.0, float(share))
 
     # Estimate number of people sharing and per‑person share
