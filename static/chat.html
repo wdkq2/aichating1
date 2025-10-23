@@ -49,6 +49,7 @@
       line-height: 1.75rem;
       font-size: 17px;
       color: var(--text);
+      white-space: pre-line;
     }
 
     .timestamp {
@@ -115,14 +116,75 @@
     function nowKR(){ return new Date(); }
     function formatKRTimestamp(d){ const h=d.getHours(); const m=String(d.getMinutes()).padStart(2,'0'); const s=String(d.getSeconds()).padStart(2,'0'); const noon=h>=12?'오후':'오전'; const hour12=((h+11)%12)+1; return `${noon} ${hour12}:${m}:${s}`;}
     async function readAsDataURL(file){ return await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(String(fr.result)); fr.onerror=rej; fr.readAsDataURL(file); }); }
-    function bubbleBot(text){ const wrap=document.createElement('div'); wrap.className='mt-5 flex items-start gap-3'; wrap.innerHTML=`
-      <div class="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center avatar-ring"><img src="${botAvatar}" class="w-full h-full object-cover" alt="avatar"/></div>
-      <div class="max-w-[76%]"><div class="px-4 py-3 rounded-2xl bubble-base" style="background:var(--bubble)">${text}</div>
-      <div class="mt-2 pr-1 text-right text-[12px] timestamp">${formatKRTimestamp(nowKR())}</div></div>`; logEl.appendChild(wrap); keepScrolledBottom(); return wrap; }
-    function bubbleMe(text){ const wrap=document.createElement('div'); wrap.className='mt-4 flex items-start gap-3 justify-end'; wrap.innerHTML=`
-      <div class="max-w-[76%]"><div class="px-4 py-3 rounded-2xl bubble-base" style="background:var(--bubbleMe)">${text}</div>
-      <div class="mt-2 pl-1 text-left text-[12px] timestamp">${formatKRTimestamp(nowKR())}</div></div>
-      <div class="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center avatar-ring"><img src="${meAvatar}" class="w-full h-full object-cover" alt="avatar"/></div>`; logEl.appendChild(wrap); keepScrolledBottom(); return wrap; }
+    function bubbleBot(text){
+      const wrap=document.createElement('div');
+      wrap.className='mt-5 flex items-start gap-3';
+
+      const avatar=document.createElement('div');
+      avatar.className='w-12 h-12 rounded-full overflow-hidden flex items-center justify-center avatar-ring';
+      const avatarImg=document.createElement('img');
+      avatarImg.src=botAvatar;
+      avatarImg.alt='avatar';
+      avatarImg.className='w-full h-full object-cover';
+      avatar.appendChild(avatarImg);
+
+      const column=document.createElement('div');
+      column.className='max-w-[76%]';
+      column.setAttribute('data-role','bubble-column');
+
+      const bubble=document.createElement('div');
+      bubble.className='px-4 py-3 rounded-2xl bubble-base';
+      bubble.style.background='var(--bubble)';
+      bubble.setAttribute('data-role','bubble-text');
+      bubble.textContent=text;
+
+      const stamp=document.createElement('div');
+      stamp.className='mt-2 pr-1 text-right text-[12px] timestamp';
+      stamp.textContent=formatKRTimestamp(nowKR());
+
+      column.appendChild(bubble);
+      column.appendChild(stamp);
+      wrap.appendChild(avatar);
+      wrap.appendChild(column);
+      logEl.appendChild(wrap);
+      keepScrolledBottom();
+      return wrap;
+    }
+    function bubbleMe(text){
+      const wrap=document.createElement('div');
+      wrap.className='mt-4 flex items-start gap-3 justify-end';
+
+      const column=document.createElement('div');
+      column.className='max-w-[76%]';
+      column.setAttribute('data-role','bubble-column');
+
+      const bubble=document.createElement('div');
+      bubble.className='px-4 py-3 rounded-2xl bubble-base';
+      bubble.style.background='var(--bubbleMe)';
+      bubble.setAttribute('data-role','bubble-text');
+      bubble.textContent=text;
+
+      const stamp=document.createElement('div');
+      stamp.className='mt-2 pl-1 text-left text-[12px] timestamp';
+      stamp.textContent=formatKRTimestamp(nowKR());
+
+      column.appendChild(bubble);
+      column.appendChild(stamp);
+
+      const avatar=document.createElement('div');
+      avatar.className='w-12 h-12 rounded-full overflow-hidden flex items-center justify-center avatar-ring';
+      const avatarImg=document.createElement('img');
+      avatarImg.src=meAvatar;
+      avatarImg.alt='avatar';
+      avatarImg.className='w-full h-full object-cover';
+      avatar.appendChild(avatarImg);
+
+      wrap.appendChild(column);
+      wrap.appendChild(avatar);
+      logEl.appendChild(wrap);
+      keepScrolledBottom();
+      return wrap;
+    }
     function formatPromptDatetime(raw){
       if(!raw) return '';
       const regex=/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/;
@@ -174,6 +236,8 @@
     function handleServerEvent(ev){
       if(ev.type==='CANDIDATE_PROMPT'){
         const node=bubbleBot(mapEventToText(ev));
+        const column=node.querySelector('[data-role="bubble-column"]');
+        if(!column) return;
         const ui=document.createElement('div');
         ui.className='mt-2 flex gap-2';
         const yes=document.createElement('button');
@@ -186,12 +250,14 @@
         no.textContent='아니요 제가 샀어요!';
         ui.appendChild(yes);
         ui.appendChild(no);
-        node.querySelector('.max-w-\\[76\%\\]').appendChild(ui);
+        column.appendChild(ui);
         function disable(){ yes.disabled=true; no.disabled=true; }
         yes.addEventListener('click',()=>labelPayment(ev.payment_id,true).then(disable));
         no.addEventListener('click',()=>labelPayment(ev.payment_id,false).then(disable));
       } else if(ev.type==='SETTLEMENT_COMPLETED'){
         const node=bubbleBot(mapEventToText(ev));
+        const column=node.querySelector('[data-role="bubble-column"]');
+        if(!column) return;
         const actionRow=document.createElement('div');
         actionRow.className='mt-2 flex gap-2';
         const correctBtn=document.createElement('button');
@@ -199,7 +265,7 @@
         correctBtn.style.cssText='border-color:#e5e7eb; background:#fff';
         correctBtn.textContent='아니에요. 제가 샀어요!';
         actionRow.appendChild(correctBtn);
-        node.querySelector('.max-w-\\[76\%\\]').appendChild(actionRow);
+        column.appendChild(actionRow);
         correctBtn.addEventListener('click',()=>labelPayment(ev.payment_id,false).then(()=>{ correctBtn.disabled=true; }));
       }
     }
